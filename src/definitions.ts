@@ -6,11 +6,22 @@ export interface NearbyPeer {
 }
 
 export interface NearbyConnectionPlugin {
-  startHosting(options: { displayName: string }): Promise<void>;
-  startDiscovering(options: { serviceId: string }): Promise<void>;
+  startHosting(options: {
+    serviceId: string;
+    displayName: string;
+  }): Promise<void>;
+
+  stopHosting(): Promise<void>;
+
+  startDiscovering(options: {
+    serviceId: string;
+  }): Promise<void>;
+
+  stopDiscovering(): Promise<void>;
 
   requestConnection(options: {
     endpointId: string;
+    displayName: string;
   }): Promise<void>;
 
   acceptConnection(options: {
@@ -18,12 +29,24 @@ export interface NearbyConnectionPlugin {
     accept: boolean;
   }): Promise<void>;
 
-    sendMessage(options: {
-      endpointId: string;
-      message: string;
+  sendMessage(options: {
+    endpointId: string;
+    message: string;
   }): Promise<void>;
 
-  disconnect(): Promise<void>;
+  disconnect(options?: {
+    endpointId?: string;
+  }): Promise<void>;
+
+  addListener(
+    eventName: 'peerFound',
+    listener: (peer: NearbyPeer) => void,
+  ): Promise<PluginListenerHandle>;
+
+  addListener(
+    eventName: 'peerLost',
+    listener: (peer: Pick<NearbyPeer, 'endpointId'>) => void,
+  ): Promise<PluginListenerHandle>;
 
   addListener(
     eventName: 'connectionChanged',
@@ -44,5 +67,3 @@ export interface NearbyConnectionPlugin {
 
 /*   echo(options: { value: string }): Promise<{ value: string }>; */
 }
-
-
