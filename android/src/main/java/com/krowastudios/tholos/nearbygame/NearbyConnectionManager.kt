@@ -1,6 +1,7 @@
 package com.krowastudios.tholos.nearbygame
 
 import android.content.Context
+import android.util.Log
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.AdvertisingOptions
 import com.google.android.gms.nearby.connection.ConnectionInfo
@@ -20,6 +21,7 @@ class NearbyConnectionManager(
     context: Context,
     private val listener: Listener,
 ) {
+    private val tag = "NearbyConnectionManager"
     private val client = Nearby.getConnectionsClient(context)
     private val strategy = Strategy.P2P_CLUSTER
 
@@ -58,15 +60,19 @@ class NearbyConnectionManager(
         return Tasks.forResult(null)
     }
 
-    fun requestConnection(endpointId: String, displayName: String): Task<Void> =
-        client.requestConnection(
+    fun requestConnection(endpointId: String, displayName: String): Task<Void> {
+        Log.i(tag, "Requesting connection: endpointId=$endpointId, displayName=$displayName")
+        return client.requestConnection(
             displayName,
             endpointId,
             connectionLifecycleCallback,
         )
+    }
 
-    fun acceptConnection(endpointId: String): Task<Void> =
-        client.acceptConnection(endpointId, payloadCallback)
+    fun acceptConnection(endpointId: String): Task<Void> {
+        Log.i(tag, "Accepting connection: endpointId=$endpointId")
+        return client.acceptConnection(endpointId, payloadCallback)
+    }
 
     fun rejectConnection(endpointId: String): Task<Void> =
         client.rejectConnection(endpointId)
@@ -113,15 +119,21 @@ class NearbyConnectionManager(
 
     private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
         override fun onConnectionInitiated(endpointId: String, info: ConnectionInfo) {
+            Log.i(tag, "Connection initiated: endpointId=$endpointId, name=${info.endpointName}")
             listener.onConnectionRequested(endpointId, info.endpointName)
         }
 
         override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
             val state = if (result.status.isSuccess) "connected" else "rejected"
+            Log.i(
+                tag,
+                "Connection result: endpointId=$endpointId, state=$state, status=${result.status}",
+            )
             listener.onConnectionStateChanged(endpointId, state, null)
         }
 
         override fun onDisconnected(endpointId: String) {
+            Log.i(tag, "Disconnected: endpointId=$endpointId")
             listener.onConnectionStateChanged(endpointId, "disconnected", null)
         }
     }

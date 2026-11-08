@@ -1,6 +1,8 @@
 package com.krowastudios.tholos.nearbygame;
 
 import android.Manifest;
+import android.os.Build;
+import android.util.Log;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
@@ -17,16 +19,31 @@ import com.getcapacitor.annotation.PermissionCallback;
                 @Permission(
                         alias = "nearby",
                         strings = {
+                                Manifest.permission.NEARBY_WIFI_DEVICES,
                                 Manifest.permission.BLUETOOTH_SCAN,
                                 Manifest.permission.BLUETOOTH_CONNECT,
-                                Manifest.permission.BLUETOOTH_ADVERTISE,
+                                Manifest.permission.BLUETOOTH_ADVERTISE
+                        }
+                ),
+                @Permission(
+                        alias = "nearbyBluetooth",
+                        strings = {
+                                Manifest.permission.BLUETOOTH_SCAN,
+                                Manifest.permission.BLUETOOTH_CONNECT,
+                                Manifest.permission.BLUETOOTH_ADVERTISE
+                        }
+                ),
+                @Permission(
+                        alias = "nearbyLegacy",
+                        strings = {
                                 Manifest.permission.ACCESS_FINE_LOCATION
                         }
                 )
         }
 )
-public class ExamplePlugin extends Plugin implements NearbyConnectionManager.Listener {
+public class NearbyGamePlugin extends Plugin implements NearbyConnectionManager.Listener {
 
+    private static final String TAG = "NearbyGamePlugin";
     private NearbyConnectionManager manager;
 
     @Override
@@ -126,19 +143,23 @@ public class ExamplePlugin extends Plugin implements NearbyConnectionManager.Lis
     }
 
     private void runWithNearbyPermission(PluginCall call, TaskSupplier operation) {
-        if (getPermissionState("nearby") != PermissionState.GRANTED) {
-            requestPermissionForAlias("nearby", call, "nearbyPermissions");
+        String permissionAlias = getNearbyPermissionAlias();
+        if (getPermissionState(permissionAlias) != PermissionState.GRANTED) {
+            requestPermissionForAlias(permissionAlias, call, "nearbyPermissions");
             return;
         }
 
         operation.run()
                 .addOnSuccessListener(unused -> call.resolve())
-                .addOnFailureListener(error -> call.reject("Nearby operation failed", error));
+                .addOnFailureListener(error -> {
+                    Log.e(TAG, call.getMethodName() + " failed", error);
+                    call.reject("Nearby operation failed: " + error.getMessage(), error);
+                });
     }
 
     @PermissionCallback
     private void nearbyPermissions(PluginCall call) {
-        if (getPermissionState("nearby") != PermissionState.GRANTED) {
+        if (getPermissionState(getNearbyPermissionAlias()) != PermissionState.GRANTED) {
             call.reject("Nearby permissions are required");
             return;
         }
@@ -173,6 +194,13 @@ public class ExamplePlugin extends Plugin implements NearbyConnectionManager.Lis
         }
     }
 
+    private String getNearbyPermissionAlias() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return "nearby";
+        }
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? "nearbyBluetooth" : "nearbyLegacy";
+    }
+
     private boolean requireText(PluginCall call, String value, String name) {
         if (value == null || value.isBlank()) {
             call.reject(name + " is required");
@@ -204,11 +232,13 @@ public class ExamplePlugin extends Plugin implements NearbyConnectionManager.Lis
 
     @Override
     public void onConnectionRequested(String endpointId, String name) {
+        Log.i(TAG, "Connection requested: endpointId=" + endpointId + ", name=" + name);
         notifyConnectionChanged(endpointId, "requested", name);
     }
 
     @Override
     public void onConnectionStateChanged(String endpointId, String state, String name) {
+        Log.i(TAG, "Connection state: endpointId=" + endpointId + ", state=" + state);
         notifyConnectionChanged(endpointId, state, name);
     }
 
