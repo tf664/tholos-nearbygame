@@ -55,15 +55,16 @@ must still allow the runtime permission request when the plugin starts its
 first operation.
 
 # TODO
+
 write a pipeline/bash script for:
 Edit package
-   ↓
+↓
 npm run build
-   ↓
+↓
 Install/update package in consuming app
-   ↓
+↓
 npx cap sync
-   ↓
+↓
 Build/run consuming app
 
 ---
@@ -157,19 +158,44 @@ are not missed. A connection request is reported to the host through
 `connectionChanged` with `state: 'requested'`; the host must call
 `acceptConnection` with `accept: true` or `false`.
 
+## Session coordination
+
+For games that need a shared roster and host-authoritative state updates, use
+the optional `NearbyGameSession<TMember, TState>` exported by the package.
+It manages transport listeners, player registration, snapshots, start-game
+messages, state-update messages, and cleanup. The application supplies its
+own member/state types and rules:
+
+- `validateMember` validates a joining or updated member against the current
+  roster.
+- `parseState` validates state received over the connection.
+- `addMember`, `updateMember`, and `removeMember` keep game state in sync with
+  roster changes.
+- `applyStateUpdate` decides whether a member's proposed state change is
+  allowed. Return `null` to reject it; the host's current state is sent back.
+
+Subscribe to snapshots for UI updates, then call `host(member, initialState)`
+on the host or `discover(member)` followed by `connect(endpointId)` on a guest.
+After players connect, the host can call `startGame()`. Use `updateProfile()`
+and `updateState()` for later changes, and `stop()` when the session ends.
+The snapshot includes the role, connection status, discovered peers, roster,
+state, local member, game-started flag, and any error.
+
+This coordinator is in-memory and peer-to-peer; it does not provide accounts,
+persistent storage, matchmaking, or a remote server. Game-specific rules
+(such as player limits, unique colors, and allowed score changes) remain the
+application's responsibility.
+
 ## Sending and receiving messages
 
 Messages are UTF-8 strings. Serialize structured game data before sending and
 parse it when receiving:
 
 ```ts
-const messageReceived = await NearbyGame.addListener(
-  'messageReceived',
-  ({ endpointId, message }) => {
-    const data = JSON.parse(message) as { type: string };
-    console.log('Message from', endpointId, data.type);
-  },
-);
+const messageReceived = await NearbyGame.addListener('messageReceived', ({ endpointId, message }) => {
+  const data = JSON.parse(message) as { type: string };
+  console.log('Message from', endpointId, data.type);
+});
 
 await NearbyGame.sendMessage({
   endpointId: 'endpoint-id-from-peerFound',
@@ -182,12 +208,12 @@ await NearbyGame.sendMessage({
 
 ## Events
 
-| Event | Payload | Description |
-| --- | --- | --- |
-| `peerFound` | `{ endpointId, name }` | A discoverable host was found. |
-| `peerLost` | `{ endpointId }` | A previously discovered host is no longer available. |
+| Event               | Payload                        | Description                                                       |
+| ------------------- | ------------------------------ | ----------------------------------------------------------------- |
+| `peerFound`         | `{ endpointId, name }`         | A discoverable host was found.                                    |
+| `peerLost`          | `{ endpointId }`               | A previously discovered host is no longer available.              |
 | `connectionChanged` | `{ endpointId, state, name? }` | A connection was requested, connected, rejected, or disconnected. |
-| `messageReceived` | `{ endpointId, message }` | A UTF-8 text message was received. |
+| `messageReceived`   | `{ endpointId, message }`      | A UTF-8 text message was received.                                |
 
 Possible `connectionChanged.state` values are `requested`, `connected`,
 `rejected`, and `disconnected`.

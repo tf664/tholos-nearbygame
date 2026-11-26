@@ -7,4 +7,5 @@ const NearbyGame = registerPlugin<NearbyConnectionPlugin>('NearbyGame', {
 });
 
 export * from './definitions';
+export * from './session';
 export { NearbyGame };
