@@ -54,8 +54,6 @@ The Android manifest permissions are included by the plugin. The application
 must still allow the runtime permission request when the plugin starts its
 first operation.
 
-# TODO
-
 write a pipeline/bash script for:
 Edit package
 ↓
